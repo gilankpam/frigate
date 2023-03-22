@@ -3,13 +3,20 @@
 # https://askubuntu.com/questions/972516/debian-frontend-environment-variable
 ARG DEBIAN_FRONTEND=noninteractive
 
-FROM debian:11 AS base
+# FROM debian:11 AS base
+FROM ubuntu:jammy AS base
+# update mirror
+RUN apt update && \
+    apt install -y ca-certificates && \
+    sed -i 's/http:\/\/ports.ubuntu.com\/ubuntu-ports\//https:\/\/mirror.kumi.systems\/ubuntu-ports\//g' /etc/apt/sources.list && \
+    apt update
 
-FROM --platform=linux/amd64 debian:11 AS base_amd64
+# FROM --platform=linux/amd64 debian:11 AS base_amd64
 
-FROM debian:11-slim AS slim-base
+# FROM debian:11-slim AS slim-base
+# FROM ubuntu:jammy AS slim-base
 
-FROM slim-base AS wget
+FROM base AS wget
 ARG DEBIAN_FRONTEND
 RUN apt-get update \
     && apt-get install -y wget xz-utils \
@@ -40,59 +47,65 @@ RUN wget -qO go2rtc "https://github.com/AlexxIT/go2rtc/releases/download/v1.2.0/
 #
 ####
 # Download and Convert OpenVino model
-FROM base_amd64 AS ov-converter
-ARG DEBIAN_FRONTEND
+# FROM base_amd64 AS ov-converter
+# ARG DEBIAN_FRONTEND
 
-# Install OpenVino Runtime and Dev library
-COPY requirements-ov.txt /requirements-ov.txt
-RUN apt-get -qq update \
-    && apt-get -qq install -y wget python3 python3-distutils \
-    && wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
-    && python3 get-pip.py "pip" \
-    && pip install -r /requirements-ov.txt
+# # Install OpenVino Runtime and Dev library
+# COPY requirements-ov.txt /requirements-ov.txt
+# RUN apt-get -qq update \
+#     && apt-get -qq install -y wget python3 python3-distutils \
+#     && wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
+#     && python3 get-pip.py "pip" \
+#     && pip install -r /requirements-ov.txt
 
-# Get OpenVino Model
-RUN mkdir /models \
-    && cd /models && omz_downloader --name ssdlite_mobilenet_v2 \
-    && cd /models && omz_converter --name ssdlite_mobilenet_v2 --precision FP16
+# # Get OpenVino Model
+# RUN mkdir /models \
+#     && cd /models && omz_downloader --name ssdlite_mobilenet_v2 \
+#     && cd /models && omz_converter --name ssdlite_mobilenet_v2 --precision FP16
 
 
 # libUSB - No Udev
-FROM wget as libusb-build
-ARG TARGETARCH
-ARG DEBIAN_FRONTEND
+# FROM wget as libusb-build
+# ARG TARGETARCH
+# ARG DEBIAN_FRONTEND
 
-# Build libUSB without udev.  Needed for Openvino NCS2 support
-WORKDIR /opt
-RUN apt-get update && apt-get install -y unzip build-essential automake libtool
-RUN wget -q https://github.com/libusb/libusb/archive/v1.0.25.zip -O v1.0.25.zip && \
-    unzip v1.0.25.zip && cd libusb-1.0.25 && \
-    ./bootstrap.sh && \
-    ./configure --disable-udev --enable-shared && \
-    make -j $(nproc --all)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libusb-1.0-0-dev && \
-    rm -rf /var/lib/apt/lists/*
-WORKDIR /opt/libusb-1.0.25/libusb
-RUN /bin/mkdir -p '/usr/local/lib' && \
-    /bin/bash ../libtool  --mode=install /usr/bin/install -c libusb-1.0.la '/usr/local/lib' && \
-    /bin/mkdir -p '/usr/local/include/libusb-1.0' && \
-    /usr/bin/install -c -m 644 libusb.h '/usr/local/include/libusb-1.0' && \
-    /bin/mkdir -p '/usr/local/lib/pkgconfig' && \
-    cd  /opt/libusb-1.0.25/ && \
-    /usr/bin/install -c -m 644 libusb-1.0.pc '/usr/local/lib/pkgconfig' && \
-    ldconfig
+# # Build libUSB without udev.  Needed for Openvino NCS2 support
+# WORKDIR /opt
+# RUN apt-get update && apt-get install -y unzip build-essential automake libtool
+# RUN wget -q https://github.com/libusb/libusb/archive/v1.0.25.zip -O v1.0.25.zip && \
+#     unzip v1.0.25.zip && cd libusb-1.0.25 && \
+#     ./bootstrap.sh && \
+#     ./configure --disable-udev --enable-shared && \
+#     make -j $(nproc --all)
+# RUN apt-get update && \
+#     apt-get install -y --no-install-recommends libusb-1.0-0-dev && \
+#     rm -rf /var/lib/apt/lists/*
+# WORKDIR /opt/libusb-1.0.25/libusb
+# RUN /bin/mkdir -p '/usr/local/lib' && \
+#     /bin/bash ../libtool  --mode=install /usr/bin/install -c libusb-1.0.la '/usr/local/lib' && \
+#     /bin/mkdir -p '/usr/local/include/libusb-1.0' && \
+#     /usr/bin/install -c -m 644 libusb.h '/usr/local/include/libusb-1.0' && \
+#     /bin/mkdir -p '/usr/local/lib/pkgconfig' && \
+#     cd  /opt/libusb-1.0.25/ && \
+#     /usr/bin/install -c -m 644 libusb-1.0.pc '/usr/local/lib/pkgconfig' && \
+#     ldconfig
 
 FROM wget AS models
 
 # Get model and labels
 RUN wget -qO edgetpu_model.tflite https://github.com/google-coral/test_data/raw/release-frogfish/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite
 RUN wget -qO cpu_model.tflite https://github.com/google-coral/test_data/raw/release-frogfish/ssdlite_mobiledet_coco_qat_postprocess.tflite
+RUN mkdir -p ./usr/lib && \
+    wget -qO ./usr/lib/librknnrt.so https://github.com/rockchip-linux/rknpu2/raw/master/runtime/RK3588/Linux/librknn_api/aarch64/librknnrt.so
+
+
 COPY labelmap.txt .
+# yolov5 RKNN model converted from tflite
+COPY yolov5s_f16.rknn .
 # Copy OpenVino model
-COPY --from=ov-converter /models/public/ssdlite_mobilenet_v2/FP16 openvino-model
-RUN wget -q https://github.com/openvinotoolkit/open_model_zoo/raw/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt && \
-    sed -i 's/truck/car/g' openvino-model/coco_91cl_bkgr.txt
+# COPY --from=ov-converter /models/public/ssdlite_mobilenet_v2/FP16 openvino-model
+# RUN wget -q https://github.com/openvinotoolkit/open_model_zoo/raw/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt && \
+#     sed -i 's/truck/car/g' openvino-model/coco_91cl_bkgr.txt
 
 
 
@@ -103,32 +116,37 @@ RUN --mount=type=bind,source=docker/install_s6_overlay.sh,target=/deps/install_s
 
 
 FROM base AS wheels
-ARG DEBIAN_FRONTEND
+ARG DEBIAN_FRONTEND=noninteractive
 ARG TARGETARCH
+ARG TZ=Asia/Jakarta
 
 # Use a separate container to build wheels to prevent build dependencies in final image
-RUN apt-get -qq update \
-    && apt-get -qq install -y \
-    apt-transport-https \
-    gnupg \
-    wget \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9165938D90FDDD2E \
-    && echo "deb http://raspbian.raspberrypi.org/raspbian/ bullseye main contrib non-free rpi" | tee /etc/apt/sources.list.d/raspi.list \
-    && apt-get -qq update \
-    && apt-get -qq install -y \
-    python3 \
-    python3-dev \
-    wget \
-    # opencv dependencies
-    build-essential cmake git pkg-config libgtk-3-dev \
-    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-    libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \
-    gfortran openexr libatlas-base-dev libssl-dev\
-    libtbb2 libtbb-dev libdc1394-22-dev libopenexr-dev \
-    libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev \
-    # scipy dependencies
-    gcc gfortran libopenblas-dev liblapack-dev && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y \
+        apt-transport-https \
+        gnupg \
+        # wget \
+        # && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9165938D90FDDD2E \
+        # && echo "deb http://raspbian.raspberrypi.org/raspbian/ bullseye main contrib non-free rpi" | tee /etc/apt/sources.list.d/raspi.list \
+        # && apt-get -qq update \
+        # && apt-get -qq install -y \
+        #python3 \
+        #python3-dev \
+        wget \
+        # opencv dependencies
+        build-essential cmake git pkg-config libgtk-3-dev \
+        libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+        libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \
+        gfortran openexr libatlas-base-dev libssl-dev\
+        libtbb2 libtbb-dev libdc1394-dev libopenexr-dev \
+        libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev \
+        # scipy dependencies
+        gcc gfortran libopenblas-dev liblapack-dev software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt install -y python3.9 python3.9-dev python3.9-distutils \
+    && rm -f /usr/bin/python3 \
+    && ln -s /usr/bin/python3.9 /usr/bin/python3 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
     && python3 get-pip.py "pip"
@@ -153,19 +171,28 @@ ARG TARGETARCH
 COPY requirements-tensorrt.txt /requirements-tensorrt.txt
 RUN mkdir -p /trt-wheels && pip3 wheel --wheel-dir=/trt-wheels -r requirements-tensorrt.txt
 
+# ArmNN
+FROM wget AS armnn
+
+ADD https://github.com/ARM-software/armnn/releases/download/v23.02/ArmNN-linux-aarch64.tar.gz .
+RUN mkdir -p /rootfs/usr/lib/ArmNN-linux-aarch64 && \
+    tar xfvz ./ArmNN-linux-aarch64.tar.gz -C /rootfs/usr/lib/ArmNN-linux-aarch64 && \
+    rm ./ArmNN-linux-aarch64.tar.gz
+
 
 # Collect deps in a single layer
 FROM scratch AS deps-rootfs
 COPY --from=nginx /usr/local/nginx/ /usr/local/nginx/
 COPY --from=go2rtc /rootfs/ /
-COPY --from=libusb-build /usr/local/lib /usr/local/lib
+# COPY --from=libusb-build /usr/local/lib /usr/local/lib
 COPY --from=s6-overlay /rootfs/ /
 COPY --from=models /rootfs/ /
+COPY --from=armnn /rootfs/ /
 COPY docker/rootfs/ /
 
 
 # Frigate deps (ffmpeg, python, nginx, go2rtc, s6-overlay, etc)
-FROM slim-base AS deps
+FROM base AS deps
 ARG TARGETARCH
 
 ARG DEBIAN_FRONTEND
@@ -176,11 +203,14 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES="compute,video,utility"
 
-ENV PATH="/usr/lib/btbn-ffmpeg/bin:/usr/local/go2rtc/bin:/usr/local/nginx/sbin:${PATH}"
+ENV PATH="/usr/local/go2rtc/bin:/usr/local/nginx/sbin:${PATH}"
 
 # Install dependencies
 RUN --mount=type=bind,source=docker/install_deps.sh,target=/deps/install_deps.sh \
     /deps/install_deps.sh
+
+RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
+    && python3 get-pip.py "pip"
 
 RUN --mount=type=bind,from=wheels,source=/wheels,target=/deps/wheels \
     pip3 install -U /deps/wheels/*.whl
@@ -196,6 +226,7 @@ EXPOSE 8555/tcp 8555/udp
 
 # Configure logging to prepend timestamps, log to stdout, keep 0 archives and rotate on 10MB
 ENV S6_LOGGING_SCRIPT="T 1 n0 s10000000 T"
+ENV LD_LIBRARY_PATH="/usr/lib/ArmNN-linux-aarch64:${LD_LIBRARY_PATH}"
 
 ENTRYPOINT ["/init"]
 CMD []
@@ -233,7 +264,7 @@ CMD ["sleep", "infinity"]
 
 # Frigate web build
 # force this to run on amd64 because QEMU is painfully slow
-FROM --platform=linux/amd64 node:16 AS web-build
+FROM --platform=linux/arm64 node:16 AS web-build
 
 WORKDIR /work
 COPY web/package.json web/package-lock.json ./
@@ -257,6 +288,8 @@ FROM deps AS frigate
 
 WORKDIR /opt/frigate/
 COPY --from=rootfs / /
+
+# RUN ln -s /usr/bin/python3.9 /usr/bin/python3
 
 # Frigate w/ TensorRT Support as separate image
 FROM frigate AS frigate-tensorrt

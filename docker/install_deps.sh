@@ -2,17 +2,18 @@
 
 set -euxo pipefail
 
-apt-get -qq update
+apt update
 
-apt-get -qq install --no-install-recommends -y \
+apt install --no-install-recommends -y \
     apt-transport-https \
     gnupg \
     wget \
     procps vainfo \
     unzip locales tzdata libxml2 xz-utils \
-    python3-pip \
     curl \
-    jq
+    jq \
+    software-properties-common \
+    gpg-agent
 
 mkdir -p -m 600 /root/.gnupg
 
@@ -22,12 +23,12 @@ echo "deb [signed-by=/usr/share/keyrings/google-edgetpu.gpg] https://packages.cl
 echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections
 
 # enable non-free repo
-sed -i -e's/ main/ main contrib non-free/g' /etc/apt/sources.list
+# sed -i -e's/ main/ main contrib non-free/g' /etc/apt/sources.list
 
 # coral drivers
-apt-get -qq update
-apt-get -qq install --no-install-recommends --no-install-suggests -y \
-    libedgetpu1-max python3-tflite-runtime python3-pycoral
+apt update
+apt install --no-install-recommends --no-install-suggests -y \
+    libedgetpu1-max #python3-tflite-runtime python3-pycoral
 
 # btbn-ffmpeg -> amd64
 if [[ "${TARGETARCH}" == "amd64" ]]; then
@@ -47,13 +48,13 @@ if [[ "${TARGETARCH}" == "arm" ]]; then
 fi
 
 # ffmpeg -> arm64
-if [[ "${TARGETARCH}" == "arm64" ]]; then
+# if [[ "${TARGETARCH}" == "arm64" ]]; then
     # add raspberry pi repo
-    gpg --no-default-keyring --keyring /usr/share/keyrings/raspbian.gpg --keyserver keyserver.ubuntu.com --recv-keys 82B129927FA3303E
-    echo "deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspberrypi.org/debian/ bullseye main" | tee /etc/apt/sources.list.d/raspi.list
-    apt-get -qq update
-    apt-get -qq install --no-install-recommends --no-install-suggests -y ffmpeg
-fi
+    #gpg --no-default-keyring --keyring /usr/share/keyrings/raspbian.gpg --keyserver keyserver.ubuntu.com --recv-keys 82B129927FA3303E
+    #echo "deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspberrypi.org/debian/ bullseye main" | tee /etc/apt/sources.list.d/raspi.list
+    #apt-get -qq update
+    # apt-get -qq install --no-install-recommends --no-install-suggests -y ffmpeg
+# fi
 
 # arch specific packages
 if [[ "${TARGETARCH}" == "amd64" ]]; then
@@ -85,7 +86,37 @@ if [[ "${TARGETARCH}" == "arm" ]]; then
         libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev
 fi
 
-apt-get purge gnupg apt-transport-https wget xz-utils -y
+# Install ArmNN
+add-apt-repository -y ppa:armnn/ppa
+apt install -y armnn-latest-all \
+    armnn-latest-cpu-gpu-ref \
+    armnn-latest-cpu-gpu \
+    armnn-latest-cpu \
+    armnn-latest-gpu \
+    armnn-latest-ref \
+    libarmnn-cpuacc-backend32 \
+    libarmnn-cpuref-backend32 \
+    libarmnn-gpuacc-backend32 \
+    libarmnn22 \
+    libarmnn32 \
+    libarmnnaclcommon22 \
+    libarmnnaclcommon32 \
+    libarmnntfliteparser24 \
+    python3-pyarmnn
+
+add-apt-repository -y ppa:liujianfeng1994/panfork-mesa
+add-apt-repository -y ppa:liujianfeng1994/rockchip-multimedia
+
+# Install ffmpeg and stuff
+apt install -y mali-g610-firmware ocl-icd-opencl-dev libmali-g610-x11 ffmpeg
+
+# Install python 3.9
+add-apt-repository -y ppa:deadsnakes/ppa
+apt install -y python3.9 python3.9-dev python3.9-distutils
+rm -f /usr/bin/python3
+ln -s /usr/bin/python3.9 /usr/bin/python3
+
+apt-get purge gnupg apt-transport-https xz-utils software-properties-common -y
 apt-get clean autoclean -y
 apt-get autoremove --purge -y
 rm -rf /var/lib/apt/lists/*

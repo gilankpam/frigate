@@ -20,7 +20,7 @@ amd64:
 	docker buildx build --platform linux/amd64 --target=frigate-tensorrt --tag $(IMAGE_REPO):$(VERSION)-$(COMMIT_HASH)-tensorrt .
 
 arm64:
-	docker buildx build --platform linux/arm64 --target=frigate --tag $(IMAGE_REPO):$(VERSION)-$(COMMIT_HASH) .
+	docker buildx build --platform linux/arm64 --target=frigate --tag $(IMAGE_REPO):$(VERSION)-$(COMMIT_HASH) --load .
 
 armv7:
 	docker buildx build --platform linux/arm/v7 --target=frigate --tag $(IMAGE_REPO):$(VERSION)-$(COMMIT_HASH) .
