@@ -34,8 +34,8 @@ services:
       # - ./debug/trt-models:/trt-models
       # - /dev/bus/usb:/dev/bus/usb
     ports:
-      - "0.0.0.0:5001:5000"
-      - "0.0.0.0:5174:5173"
+      - "0.0.0.0:5000:5000"
+      - "0.0.0.0:5173:5173"
   mqtt:
     container_name: mqtt-dev
     image: eclipse-mosquitto:1.6

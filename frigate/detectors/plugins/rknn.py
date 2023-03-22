@@ -1,8 +1,10 @@
-import logging
-import torch
-import torchvision
 import numpy as np
+import re
+import math
+import random
+import cv2
 
+import logging
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig
 from typing import Literal
@@ -12,95 +14,50 @@ logger = logging.getLogger(__name__)
 
 DETECTOR_KEY = "rknn"
 
-def non_max_suppression(
-        prediction,
-        conf_thres=0.25,
-        iou_thres=0.45,
-        classes=None,
-        agnostic=False,
-        multi_label=False,
-        labels=(),
-        max_det=300,
-        nm=0,  # number of masks
-):
-    """Non-Maximum Suppression (NMS) on inference results to reject overlapping detections
+INPUT_SIZE = 300
 
-    Returns:
-         list of detections, on (n,6) tensor per image [xyxy, conf, cls]
-    """
+NUM_RESULTS = 1917
+NUM_CLASSES = 91
 
-    # Checks
-    assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
-    assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
-    bs = prediction.shape[0]  # batch size
-    nc = prediction.shape[2] - nm - 5  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
+Y_SCALE = 10.0
+X_SCALE = 10.0
+H_SCALE = 5.0
+W_SCALE = 5.0
 
-    max_wh = 7680  # (pixels) maximum box width and height
-    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    time_limit = 0.5 + 0.05 * bs  # seconds to quit after
-    redundant = True  # require redundant detections
-    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
-
-    mi = 5 + nc  # mask start index
-    output = [torch.zeros((0, 6 + nm), device='cpu')] * bs
-    for xi, x in enumerate(prediction):  # image index, image inference
-        # Apply constraints
-        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
+def expit(x):
+    return 1. / (1. + math.exp(-x))
 
 
-        # If none remain process next image
-        if not x.shape[0]:
-            continue
+def unexpit(y):
+    return -1.0 * math.log((1.0 / y) - 1.0)
 
-        # Compute conf
-        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
 
-        # Box/Mask
-        box = xywh2xyxy(x[:, :4])  # center_x, center_y, width, height) to (x1, y1, x2, y2)
-        mask = x[:, mi:]  # zero columns if no masks
+def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
+    w = max(0.0, min(xmax0, xmax1) - max(xmin0, xmin1))
+    h = max(0.0, min(ymax0, ymax1) - max(ymin0, ymin1))
+    i = w * h
+    u = (xmax0 - xmin0) * (ymax0 - ymin0) + (xmax1 - xmin1) * (ymax1 - ymin1) - i
 
-        # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
-            i, j = (x[:, 5:mi] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, 5 + j, None], j[:, None].float(), mask[i]), 1)
-        else:  # best class only
-            conf, j = x[:, 5:mi].max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
+    if u <= 0.0:
+        return 0.0
 
-        # Check shape
-        n = x.shape[0]  # number of boxes
-        if not n:  # no boxes
-            continue
-        x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
+    return i / u
 
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        i = i[:max_det]  # limit detections
-        if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
+def load_box_priors(path):
+    box_priors_ = []
+    fp = open(path, 'r')
+    ls = fp.readlines()
+    for s in ls:
+        aList = re.findall('([-+]?\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', s)
+        for ss in aList:
+            aNum = float((ss[0]+ss[2]))
+            box_priors_.append(aNum)
+    fp.close()
 
-        output[xi] = x[i]
+    box_priors = np.array(box_priors_)
+    box_priors = box_priors.reshape(4, NUM_RESULTS)
 
-    return output
-
-def xywh2xyxy(x):
-    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
-    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-    y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
-    y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
-    y[..., 2] = x[..., 0] + x[..., 2] / 2  # bottom right x
-    y[..., 3] = x[..., 1] + x[..., 3] / 2  # bottom right y
-    return y
+    return box_priors
 
 class RknnDetectorConfig(BaseDetectorConfig):
     type: Literal[DETECTOR_KEY]
@@ -124,25 +81,98 @@ class Rknn(DetectionApi):
             logger.error('Error initialize rknn model')
         if self.rknn_lite.init_runtime(core_mask=config.core_mask) != 0:
             logger.error('Error init rknn runtime')
+        self.box_priors = load_box_priors('/box_priors.txt')
 
     def detect_raw(self, tensor_input):
-        raw_output = self.rknn_lite.inference(inputs=[tensor_input])
-        output = torch.mean(torch.Tensor(raw_output[0]), -1)
-        output = non_max_suppression(output)[0]
+        outputs = self.rknn_lite.inference(inputs=[tensor_input])
+        predictions = outputs[0].reshape((1, NUM_RESULTS, 4))
+        outputClasses = outputs[1].reshape((1, NUM_RESULTS, NUM_CLASSES))
+        candidateBox = np.zeros([2, NUM_RESULTS], dtype=int)
+        classScore = [-1000.0] * NUM_RESULTS
+        vaildCnt = 0
+
+        box_priors = self.box_priors
+
+        # Post Process
+        # got valid candidate box
+        for i in range(0, NUM_RESULTS):
+            topClassScoreIndex = np.argmax(outputClasses[0][i][1:]) + 1
+            topClassScore = expit(outputClasses[0][i][topClassScoreIndex])
+            if topClassScore > 0.4:
+                candidateBox[0][vaildCnt] = i
+                candidateBox[1][vaildCnt] = topClassScoreIndex
+                classScore[vaildCnt] = topClassScore
+                vaildCnt += 1
+
+        # calc position
+        for i in range(0, vaildCnt):
+            if candidateBox[0][i] == -1:
+                continue
+
+            n = candidateBox[0][i]
+            ycenter = predictions[0][n][0] / Y_SCALE * box_priors[2][n] + box_priors[0][n]
+            xcenter = predictions[0][n][1] / X_SCALE * box_priors[3][n] + box_priors[1][n]
+            h = math.exp(predictions[0][n][2] / H_SCALE) * box_priors[2][n]
+            w = math.exp(predictions[0][n][3] / W_SCALE) * box_priors[3][n]
+
+            ymin = ycenter - h / 2.
+            xmin = xcenter - w / 2.
+            ymax = ycenter + h / 2.
+            xmax = xcenter + w / 2.
+
+            predictions[0][n][0] = ymin
+            predictions[0][n][1] = xmin
+            predictions[0][n][2] = ymax
+            predictions[0][n][3] = xmax
+        
+        # NMS
+        for i in range(0, vaildCnt):
+            if candidateBox[0][i] == -1:
+                continue
+
+            n = candidateBox[0][i]
+            xmin0 = predictions[0][n][1]
+            ymin0 = predictions[0][n][0]
+            xmax0 = predictions[0][n][3]
+            ymax0 = predictions[0][n][2]
+
+            for j in range(i+1, vaildCnt):
+                m = candidateBox[0][j]
+
+                if m == -1:
+                    continue
+
+                xmin1 = predictions[0][m][1]
+                ymin1 = predictions[0][m][0]
+                xmax1 = predictions[0][m][3]
+                ymax1 = predictions[0][m][2]
+
+                iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1)
+
+                if iou >= 0.45:
+                    candidateBox[0][j] = -1
 
         detections = np.zeros((20, 6), np.float32)
-
-        for i in range(len(output)):
-            if output[i][4] < 0.2 or i == 20:
+        for i in range(0, vaildCnt):
+            if candidateBox[0][i] == -1:
+                continue
+            if i >= 20:
                 break
+
+            n = candidateBox[0][i]
+
+            xmin = max(0.0, min(1.0, predictions[0][n][1]))
+            ymin = max(0.0, min(1.0, predictions[0][n][0]))
+            xmax = max(0.0, min(1.0, predictions[0][n][3]))
+            ymax = max(0.0, min(1.0, predictions[0][n][2]))
+
             detections[i] = [
-                output[i][5],
-                output[i][4],
-                output[i][3],
-                output[i][2],
-                output[i][1],
-                output[i][0],
+                candidateBox[1][i] - 1,
+                classScore[i],
+                ymax,
+                xmax,
+                ymin,
+                xmin
             ]
 
         return detections
-

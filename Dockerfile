@@ -102,6 +102,8 @@ RUN mkdir -p ./usr/lib && \
 COPY labelmap.txt .
 # yolov5 RKNN model converted from tflite
 COPY yolov5s_f16.rknn .
+COPY ssd_mobilenet_v1_coco.rknn .
+COPY box_priors.txt .
 # Copy OpenVino model
 # COPY --from=ov-converter /models/public/ssdlite_mobilenet_v2/FP16 openvino-model
 # RUN wget -q https://github.com/openvinotoolkit/open_model_zoo/raw/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt && \
