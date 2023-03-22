@@ -104,6 +104,15 @@ def xywh2xyxy(x):
 
 class RknnDetectorConfig(BaseDetectorConfig):
     type: Literal[DETECTOR_KEY]
+    """
+    auto = 0
+    core 0 = 1
+    core 1 = 2
+    core 2 = 4
+    core 1 & 2 = 3
+    core 1 & 2 & 3 = 7
+    """
+    core_mask: int = Field(default=0, title="Set NPU working core mode")
 
 class Rknn(DetectionApi):
     type_key = DETECTOR_KEY
@@ -113,7 +122,7 @@ class Rknn(DetectionApi):
         self.rknn_lite = RKNNLite()
         if self.rknn_lite.load_rknn(config.path) != 0:
             logger.error('Error initialize rknn model')
-        if self.rknn_lite.init_runtime(core_mask=RKNNLite.NPU_CORE_AUTO) != 0:
+        if self.rknn_lite.init_runtime(core_mask=config.core_mask) != 0:
             logger.error('Error init rknn runtime')
 
     def detect_raw(self, tensor_input):
@@ -124,7 +133,7 @@ class Rknn(DetectionApi):
         detections = np.zeros((20, 6), np.float32)
 
         for i in range(len(output)):
-            if output[i][4] < 0.4 or i == 20:
+            if output[i][4] < 0.2 or i == 20:
                 break
             detections[i] = [
                 output[i][5],
