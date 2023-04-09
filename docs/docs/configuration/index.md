@@ -3,7 +3,7 @@ id: index
 title: Configuration File
 ---
 
-For Home Assistant Addon installations, the config file needs to be in the root of your Home Assistant config directory (same location as `configuration.yaml`) and named `frigate.yml`.
+For Home Assistant Addon installations, the config file needs to be in the root of your Home Assistant config directory (same location as `configuration.yaml`). It can be named `frigate.yml` or `frigate.yaml`, but if both files exist `frigate.yaml` will be preferred and `frigate.yml` will be ignored.
 
 For all other installation types, the config file should be mapped to `/config/config.yml` inside the container.
 
@@ -167,7 +167,7 @@ birdseye:
 # More information about presets at https://docs.frigate.video/configuration/ffmpeg_presets
 ffmpeg:
   # Optional: global ffmpeg args (default: shown below)
-  global_args: -hide_banner -loglevel warning
+  global_args: -hide_banner -loglevel warning -threads 2
   # Optional: global hwaccel args (default: shown below)
   # NOTE: See hardware acceleration docs for your specific device
   hwaccel_args: []
@@ -176,7 +176,7 @@ ffmpeg:
   # Optional: global output args
   output_args:
     # Optional: output args for detect streams (default: shown below)
-    detect: -f rawvideo -pix_fmt yuv420p
+    detect: -threads 2 -f rawvideo -pix_fmt yuv420p
     # Optional: output args for record streams (default: shown below)
     record: preset-record-generic
     # Optional: output args for rtmp streams (default: shown below)
@@ -502,7 +502,7 @@ ui:
   # Optional: Set the default live mode for cameras in the UI (default: shown below)
   live_mode: mse
   # Optional: Set a timezone to use in the UI (default: use browser local time)
-  timezone: None
+  # timezone: America/Denver
   # Optional: Use an experimental recordings / camera view UI (default: shown below)
   use_experimental: False
   # Optional: Set the time format used.
