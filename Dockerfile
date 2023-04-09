@@ -201,6 +201,8 @@ ENV PATH="/usr/local/go2rtc/bin:/usr/local/nginx/sbin:${PATH}"
 RUN --mount=type=bind,source=docker/install_deps.sh,target=/deps/install_deps.sh \
     /deps/install_deps.sh
 
+RUN ln -s /usr/bin/python3.9 /usr/bin/python3
+
 RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
     && python3 get-pip.py "pip"
 
@@ -218,7 +220,6 @@ EXPOSE 8555/tcp 8555/udp
 
 # Configure logging to prepend timestamps, log to stdout, keep 0 archives and rotate on 10MB
 ENV S6_LOGGING_SCRIPT="T 1 n0 s10000000 T"
-ENV LD_LIBRARY_PATH="/usr/lib/ArmNN-linux-aarch64:${LD_LIBRARY_PATH}"
 
 ENTRYPOINT ["/init"]
 CMD []
