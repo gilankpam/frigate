@@ -27,12 +27,7 @@ W_SCALE = 5.0
 def expit(x):
     return 1. / (1. + math.exp(-x))
 
-
-def unexpit(y):
-    return -1.0 * math.log((1.0 / y) - 1.0)
-
-
-def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
+def calculate_overlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
     w = max(0.0, min(xmax0, xmax1) - max(xmin0, xmin1))
     h = max(0.0, min(ymax0, ymax1) - max(ymin0, ymin1))
     i = w * h
@@ -147,7 +142,7 @@ class Rknn(DetectionApi):
                 xmax1 = predictions[0][m][3]
                 ymax1 = predictions[0][m][2]
 
-                iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1)
+                iou = calculate_overlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1)
 
                 if iou >= 0.45:
                     candidateBox[0][j] = -1
