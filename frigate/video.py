@@ -809,6 +809,10 @@ def process_frames(
 
             # if detection was run on this frame, consolidate
             if len(regions) > 0:
+                object_tracker.match_and_update(frame_time, detections)
+                # Skip bellow step, this code bellow will merge multiple object to only one
+                # its not suitable for occupancy detection on multiple zone
+                '''
                 # group by name
                 detected_object_groups = defaultdict(lambda: [])
                 for detection in detections:
@@ -846,6 +850,7 @@ def process_frames(
                             )
                 # now that we have refined our detections, we need to track objects
                 object_tracker.match_and_update(frame_time, consolidated_detections)
+                '''
             # else, just update the frame times for the stationary objects
             else:
                 object_tracker.update_frame_times(frame_time)
