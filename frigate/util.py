@@ -571,6 +571,8 @@ def yuv_region_2_bgr(frame, region):
         print(f"region: {region}")
         raise
 
+def is_intersect(box_a, box_b):
+    return (box_b[0] < box_a[0] < box_b[2] and box_b[1] < box_a[1] < box_b[3]) or (box_b[0] < box_a[2] < box_b[2] and box_b[1] < box_a[3] < box_b[3])
 
 def intersection(box_a, box_b):
     return (

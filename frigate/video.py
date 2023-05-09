@@ -28,6 +28,7 @@ from frigate.util import (
     calculate_region,
     clipped,
     intersection,
+    is_intersect,
     intersection_over_union,
     listen,
     yuv_region_2_rgb,
@@ -809,10 +810,6 @@ def process_frames(
 
             # if detection was run on this frame, consolidate
             if len(regions) > 0:
-                object_tracker.match_and_update(frame_time, detections)
-                # Skip bellow step, this code bellow will merge multiple object to only one
-                # its not suitable for occupancy detection on multiple zone
-                '''
                 # group by name
                 detected_object_groups = defaultdict(lambda: [])
                 for detection in detections:
@@ -836,6 +833,9 @@ def process_frames(
                             len(sorted_by_area),
                         ):
                             to_check = sorted_by_area[to_check_idx][2]
+                            # skip if objects are not intersect
+                            if not is_intersect(current_detection, to_check):
+                                continue
                             # if 90% of smaller detection is inside of another detection, consolidate
                             if (
                                 area(intersection(current_detection, to_check))
@@ -850,7 +850,6 @@ def process_frames(
                             )
                 # now that we have refined our detections, we need to track objects
                 object_tracker.match_and_update(frame_time, consolidated_detections)
-                '''
             # else, just update the frame times for the stationary objects
             else:
                 object_tracker.update_frame_times(frame_time)
