@@ -86,6 +86,24 @@ if [[ "${TARGETARCH}" == "arm" ]]; then
         libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev
 fi
 
+# Install ArmNN
+add-apt-repository -y ppa:armnn/ppa
+apt install -y armnn-latest-all \
+    armnn-latest-cpu-gpu-ref \
+    armnn-latest-cpu-gpu \
+    armnn-latest-cpu \
+    armnn-latest-gpu \
+    armnn-latest-ref \
+    libarmnn-cpuacc-backend32 \
+    libarmnn-cpuref-backend32 \
+    libarmnn-gpuacc-backend32 \
+    libarmnn22 \
+    libarmnn32 \
+    libarmnnaclcommon22 \
+    libarmnnaclcommon32 \
+    libarmnntfliteparser24 \
+    python3-pyarmnn
+
 add-apt-repository -y ppa:liujianfeng1994/panfork-mesa
 add-apt-repository -y ppa:liujianfeng1994/rockchip-multimedia
 

@@ -173,6 +173,14 @@ ARG TARGETARCH
 COPY requirements-tensorrt.txt /requirements-tensorrt.txt
 RUN mkdir -p /trt-wheels && pip3 wheel --wheel-dir=/trt-wheels -r requirements-tensorrt.txt
 
+# ArmNN
+FROM wget AS armnn
+
+ADD https://github.com/ARM-software/armnn/releases/download/v23.02/ArmNN-linux-aarch64.tar.gz .
+RUN mkdir -p /rootfs/usr/lib/ArmNN-linux-aarch64 && \
+    tar xfvz ./ArmNN-linux-aarch64.tar.gz -C /rootfs/usr/lib/ArmNN-linux-aarch64 && \
+    rm ./ArmNN-linux-aarch64.tar.gz
+
 # Collect deps in a single layer
 FROM scratch AS deps-rootfs
 COPY --from=nginx /usr/local/nginx/ /usr/local/nginx/
@@ -180,6 +188,7 @@ COPY --from=go2rtc /rootfs/ /
 # COPY --from=libusb-build /usr/local/lib /usr/local/lib
 COPY --from=s6-overlay /rootfs/ /
 COPY --from=models /rootfs/ /
+COPY --from=armnn /rootfs/ /
 COPY docker/rootfs/ /
 
 
@@ -220,6 +229,7 @@ EXPOSE 8555/tcp 8555/udp
 
 # Configure logging to prepend timestamps, log to stdout, keep 0 archives and rotate on 10MB
 ENV S6_LOGGING_SCRIPT="T 1 n0 s10000000 T"
+ENV LD_LIBRARY_PATH="/usr/lib/ArmNN-linux-aarch64:${LD_LIBRARY_PATH}"
 
 ENTRYPOINT ["/init"]
 CMD []
