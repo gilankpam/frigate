@@ -382,6 +382,8 @@ function EditableMask({ onChange, points, scale, snap, width, height }) {
             onRemove={handleRemovePoint}
             x={x + MaskInset}
             y={y + MaskInset}
+            pointX={Math.round(x/scale)}
+            pointY={Math.round(y/scale)}
           />
         ))}
       <div className="absolute inset-0 right-0 bottom-0" onClick={handleAddPoint} ref={boundingRef} />
@@ -569,7 +571,7 @@ function polylinePointsToPolyline(polylinePoints) {
 }
 
 const PolyPointRadius = 10;
-function PolyPoint({ boundingRef, index, x, y, onMove, onRemove }) {
+function PolyPoint({ boundingRef, index, x, y, onMove, onRemove, pointX, pointY }) {
   const [hidden, setHidden] = useState(false);
 
   const handleDragOver = useCallback(
@@ -611,12 +613,12 @@ function PolyPoint({ boundingRef, index, x, y, onMove, onRemove }) {
   return (
     <div
       className={`${hidden ? 'opacity-0' : ''} bg-gray-900 rounded-full absolute z-20`}
-      style={`top: ${y - PolyPointRadius}px; left: ${x - PolyPointRadius}px; width: 20px; height: 20px;`}
+      style={`top: ${y - PolyPointRadius}px; left: ${x - PolyPointRadius}px; width: 20px; height: 20px; color: green;`}
       draggable
       onClick={handleClick}
       onContextMenu={handleRightClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-    />
+    >{pointX}, {pointY}</div>
   );
 }
