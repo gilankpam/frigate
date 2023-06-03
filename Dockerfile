@@ -210,7 +210,8 @@ ENV PATH="/usr/local/go2rtc/bin:/usr/local/nginx/sbin:${PATH}"
 RUN --mount=type=bind,source=docker/install_deps.sh,target=/deps/install_deps.sh \
     /deps/install_deps.sh
 
-RUN ln -s /usr/bin/python3.9 /usr/bin/python3
+RUN rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.9 /usr/bin/python3
 
 RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
     && python3 get-pip.py "pip"

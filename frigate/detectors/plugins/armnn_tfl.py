@@ -28,7 +28,7 @@ def load_armnn_delegate(library_path, options=None):
         from tensorflow.lite.python.interpreter import load_delegate
 
     if options is None:
-        options = {"backends": "CpuAcc,GpuAcc,CpuRef", "logging-severity": "info"}
+        options = {"backends": "CpuAcc,GpuAcc,CpuRef", "logging-severity": "warning"}
 
     return load_delegate(library_path, options=options)
 
