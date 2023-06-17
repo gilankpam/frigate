@@ -38,5 +38,5 @@ DetectorTypeEnum = StrEnum("DetectorTypeEnum", {k: k for k in api_types})
 
 DetectorConfig = Annotated[
     Union[tuple(BaseDetectorConfig.__subclasses__())],
-    Field(discriminator="type"),
+    Field(),
 ]

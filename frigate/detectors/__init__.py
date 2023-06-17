@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_detector(detector_config):
-    if detector_config.type == DetectorTypeEnum.cpu:
-        logger.warning(
-            "CPU detectors are not recommended and should only be used for testing or for trial purposes."
-        )
+    # if detector_config.type == DetectorTypeEnum.cpu:
+    #     logger.warning(
+    #         "CPU detectors are not recommended and should only be used for testing or for trial purposes."
+    #     )
 
     api = api_types.get(detector_config.type)
     if not api:

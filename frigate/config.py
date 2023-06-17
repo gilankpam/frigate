@@ -52,7 +52,7 @@ DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S"
 FRIGATE_ENV_VARS = {k: v for k, v in os.environ.items() if k.startswith("FRIGATE_")}
 
 DEFAULT_TRACKED_OBJECTS = ["person"]
-DEFAULT_DETECTORS = {"cpu": {"type": "cpu"}}
+DEFAULT_DETECTORS = {"rknn": {"type": "rknn"}}
 
 
 class FrigateBaseModel(BaseModel):
