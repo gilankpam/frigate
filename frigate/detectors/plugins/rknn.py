@@ -111,7 +111,7 @@ class Rknn(DetectionApi):
 
             detections[i] = [
                 d[2],
-                d[1],
+                float(1),
                 y1 / self.config.model.height,  # y_min
                 x1 / self.config.model.width,  # x_min
                 y2 / self.config.model.height,  # y_max
