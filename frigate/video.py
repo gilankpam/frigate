@@ -805,47 +805,48 @@ def process_frames(
                     refine_count += 1
 
             ## drop detections that overlap too much
-            consolidated_detections = []
+            # consolidated_detections = []
 
             # if detection was run on this frame, consolidate
             if len(regions) > 0:
                 # group by name
-                detected_object_groups = defaultdict(lambda: [])
-                for detection in detections:
-                    detected_object_groups[detection[0]].append(detection)
+                # detected_object_groups = defaultdict(lambda: [])
+                # for detection in detections:
+                #     detected_object_groups[detection[0]].append(detection)
 
-                # loop over detections grouped by label
-                for group in detected_object_groups.values():
-                    # if the group only has 1 item, skip
-                    if len(group) == 1:
-                        consolidated_detections.append(group[0])
-                        continue
+                # # loop over detections grouped by label
+                # for group in detected_object_groups.values():
+                #     # if the group only has 1 item, skip
+                #     if len(group) == 1:
+                #         consolidated_detections.append(group[0])
+                #         continue
 
-                    # sort smallest to largest by area
-                    sorted_by_area = sorted(group, key=lambda g: g[3])
+                #     # sort smallest to largest by area
+                #     sorted_by_area = sorted(group, key=lambda g: g[3])
 
-                    for current_detection_idx in range(0, len(sorted_by_area)):
-                        current_detection = sorted_by_area[current_detection_idx][2]
-                        overlap = 0
-                        for to_check_idx in range(
-                            min(current_detection_idx + 1, len(sorted_by_area)),
-                            len(sorted_by_area),
-                        ):
-                            to_check = sorted_by_area[to_check_idx][2]
-                            # if 90% of smaller detection is inside of another detection, consolidate
-                            if (
-                                area(intersection(current_detection, to_check))
-                                / area(current_detection)
-                                > 0.9
-                            ):
-                                overlap = 1
-                                break
-                        if overlap == 0:
-                            consolidated_detections.append(
-                                sorted_by_area[current_detection_idx]
-                            )
+                #     for current_detection_idx in range(0, len(sorted_by_area)):
+                #         current_detection = sorted_by_area[current_detection_idx][2]
+                #         overlap = 0
+                #         for to_check_idx in range(
+                #             min(current_detection_idx + 1, len(sorted_by_area)),
+                #             len(sorted_by_area),
+                #         ):
+                #             to_check = sorted_by_area[to_check_idx][2]
+                #             # if 90% of smaller detection is inside of another detection, consolidate
+                #             if (
+                #                 area(intersection(current_detection, to_check))
+                #                 / area(current_detection)
+                #                 > 0.9
+                #             ):
+                #                 overlap = 1
+                #                 break
+                #         if overlap == 0:
+                #             consolidated_detections.append(
+                #                 sorted_by_area[current_detection_idx]
+                #             )
                 # now that we have refined our detections, we need to track objects
-                object_tracker.match_and_update(frame_time, consolidated_detections)
+                # dont consolidate detections
+                object_tracker.match_and_update(frame_time, detections)
             # else, just update the frame times for the stationary objects
             else:
                 object_tracker.update_frame_times(frame_time)
